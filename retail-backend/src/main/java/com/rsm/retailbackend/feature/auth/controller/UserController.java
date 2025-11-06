@@ -2,18 +2,21 @@ package com.rsm.retailbackend.feature.auth.controller;
 
 import com.rsm.retailbackend.entity.User;
 import com.rsm.retailbackend.exception.BusinessException;
+import com.rsm.retailbackend.feature.auth.dto.UpdateUserStatusRequest;
 import com.rsm.retailbackend.feature.auth.dto.UserSummaryDto;
 import com.rsm.retailbackend.feature.auth.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Quản lý người dùng trong hệ thống.
- * Admin có thể xem danh sách, kích hoạt, hoặc khóa tài khoản nhân viên / quản lý chi nhánh.
+ * Quản lý tài khoản người dùng (dành cho admin).
+ * Chỉ đổi trạng thái: pending / active / locked.
+ * Không đổi mật khẩu, không đổi thông tin cá nhân ở đây.
  */
 @RestController
 @RequestMapping("/api/users")
@@ -26,10 +29,11 @@ public class UserController {
     }
 
     /**
-     *  Lấy danh sách toàn bộ người dùng
+     * Lấy danh sách toàn bộ người dùng
      */
     @GetMapping
-    public ResponseEntity<?> getAllUsers() {
+    @PreAuthorize("hasAuthority('1')") // chỉ admin
+    public ResponseEntity<List<UserSummaryDto>> getAllUsers() {
         List<UserSummaryDto> users = userRepository.findAll().stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
@@ -37,86 +41,55 @@ public class UserController {
     }
 
     /**
-     *  Lấy danh sách người dùng đang hoạt động (Status = 1)
+     * Lấy thông tin chi tiết 1 user
      */
-    @GetMapping("/active")
-    public ResponseEntity<?> getActiveUsers() {
-        List<UserSummaryDto> users = userRepository.findAll().stream()
-                .filter(u -> u.getStatus() == 1)
-                .map(this::toDto)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(users);
-    }
-
-    /**
-     *  Lấy danh sách người dùng đang chờ kích hoạt (Status = 0)
-     */
-    @GetMapping("/pending")
-    public ResponseEntity<?> getPendingUsers() {
-        List<UserSummaryDto> users = userRepository.findAll().stream()
-                .filter(u -> u.getStatus() == 0)
-                .map(this::toDto)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(users);
-    }
-
-    /**
-     *  Lấy danh sách người dùng bị khóa (Status = 2)
-     */
-    @GetMapping("/locked")
-    public ResponseEntity<?> getLockedUsers() {
-        List<UserSummaryDto> users = userRepository.findAll().stream()
-                .filter(u -> u.getStatus() == 2)
-                .map(this::toDto)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(users);
-    }
-
-    /**
-     *  Admin kích hoạt tài khoản
-     */
-    @PatchMapping("/{id}/activate")
-    public ResponseEntity<?> activateUser(@PathVariable Integer id) {
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('1')")
+    public ResponseEntity<UserSummaryDto> getUserById(@PathVariable Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Không tìm thấy người dùng", HttpStatus.NOT_FOUND.value()));
-
-        if (user.getStatus() == 1) {
-            throw new BusinessException("Tài khoản này đã được kích hoạt", HttpStatus.BAD_REQUEST.value());
-        }
-
-        user.setIsActive(true);
-        user.setStatus((short) 1);
-        userRepository.save(user);
-
-        return ResponseEntity.ok(new ResponseMessage(
-                "Tài khoản " + user.getUserName() + " đã được kích hoạt thành công."
-        ));
+        return ResponseEntity.ok(toDto(user));
     }
 
     /**
-     *  Admin khóa tài khoản nhân viên / quản lý chi nhánh
+     * Admin cập nhật trạng thái account
+     * body: { "userId": 5, "status": 1 }
      */
-    @PatchMapping("/{id}/deactivate")
-    public ResponseEntity<?> deactivateUser(@PathVariable Integer id) {
-        User user = userRepository.findById(id)
+    @PostMapping("/status")
+    @PreAuthorize("hasAuthority('1')")
+    public ResponseEntity<MessageResponse> updateStatus(@RequestBody UpdateUserStatusRequest req) {
+        if (req.getUserId() == null || req.getStatus() == null) {
+            throw new BusinessException("Thiếu userId hoặc status", HttpStatus.BAD_REQUEST.value());
+        }
+
+        User user = userRepository.findById(req.getUserId())
                 .orElseThrow(() -> new BusinessException("Không tìm thấy người dùng", HttpStatus.NOT_FOUND.value()));
 
-        if (user.getStatus() == 2) {
-            throw new BusinessException("Tài khoản này đã bị khóa trước đó", HttpStatus.BAD_REQUEST.value());
+        // chỉ cho phép 0,1,2
+        if (req.getStatus() < 0 || req.getStatus() > 2) {
+            throw new BusinessException("Trạng thái không hợp lệ", HttpStatus.BAD_REQUEST.value());
         }
 
-        user.setIsActive(false);
-        user.setStatus((short) 2);
+        // đồng bộ IsActive với Status
+        user.setStatus(req.getStatus());
+        if (req.getStatus() == 1) {
+            user.setIsActive(true);   // Active
+        } else {
+            user.setIsActive(false);  // Pending hoặc Locked
+        }
+
         userRepository.save(user);
 
-        return ResponseEntity.ok(new ResponseMessage(
-                "Tài khoản " + user.getUserName() + " đã bị khóa."
-        ));
+        String msg = switch (req.getStatus()) {
+            case 0 -> "Đã chuyển tài khoản về trạng thái chờ duyệt (Pending).";
+            case 1 -> "Đã kích hoạt tài khoản.";
+            case 2 -> "Đã khóa tài khoản.";
+            default -> "Cập nhật trạng thái tài khoản.";
+        };
+
+        return ResponseEntity.ok(new MessageResponse(msg));
     }
 
-    /**
-     *  Chuyển Entity → DTO gọn gàng
-     */
     private UserSummaryDto toDto(User u) {
         return new UserSummaryDto(
                 u.getId(),
@@ -129,8 +102,5 @@ public class UserController {
         );
     }
 
-    /**
-     * Lớp nội bộ để trả phản hồi JSON thống nhất
-     */
-    private record ResponseMessage(String thongBao) {}
+    private record MessageResponse(String message) {}
 }

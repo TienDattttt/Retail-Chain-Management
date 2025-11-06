@@ -27,6 +27,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // cho phép đăng nhập / đăng ký
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/profile/**").authenticated()
 
                         // chỉ admin tổng mới được xem hoặc duyệt user
                         .requestMatchers(HttpMethod.GET, "/api/users/**").hasRole("ADMIN")
