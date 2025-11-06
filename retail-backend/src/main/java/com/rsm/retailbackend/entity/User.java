@@ -69,10 +69,14 @@ public class User {
     @Column(name = "BirthDate")
     private LocalDate birthDate;
 
-    @NotNull
-    @ColumnDefault("1")
+    // vẫn giữ để tương thích
     @Column(name = "IsActive", nullable = false)
     private Boolean isActive = false;
+
+    // 👇 mới: trạng thái rõ ràng
+    // 0 = PENDING, 1 = ACTIVE, 2 = LOCKED
+    @Column(name = "Status", nullable = false)
+    private Short status = 0;
 
     @NotNull
     @ColumnDefault("sysdatetime()")
@@ -86,5 +90,4 @@ public class User {
     @Nationalized
     @Column(name = "AvatarUrl", length = 500)
     private String avatarUrl;
-
 }
