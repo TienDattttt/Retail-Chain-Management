@@ -1,0 +1,611 @@
+------------------------------------------------------------
+-- 0. Tạo database
+------------------------------------------------------------
+IF DB_ID('RetailSystem') IS NULL
+    CREATE DATABASE RetailSystem;
+GO
+
+USE RetailSystem;
+GO
+
+------------------------------------------------------------
+-- 1. Kho tổng
+------------------------------------------------------------
+CREATE TABLE Warehouses (
+    WarehouseId INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(200) NOT NULL,
+    [Address] NVARCHAR(500) NULL,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+
+------------------------------------------------------------
+-- 2. Chi nhánh
+------------------------------------------------------------
+CREATE TABLE Branches (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    BranchCode NVARCHAR(50) NULL,
+    Name NVARCHAR(200) NOT NULL,
+    [Address] NVARCHAR(500) NULL,
+    WardName NVARCHAR(200) NULL,
+    DistrictName NVARCHAR(200) NULL,
+    CityName NVARCHAR(200) NULL,
+    PhoneNumber NVARCHAR(50) NULL,
+    Email NVARCHAR(200) NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    IsMain BIT NOT NULL DEFAULT 0,
+    ParentId INT NULL,
+    [Level] INT NULL,
+    CreatedBy NVARCHAR(100) NULL,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CONSTRAINT FK_Branches_Parent FOREIGN KEY (ParentId)
+        REFERENCES Branches(Id)
+);
+GO
+
+------------------------------------------------------------
+-- 3. Users (role nằm trong đây)
+-- Role: 1 = Admin tổng, 2 = QL chi nhánh, 3 = NV chi nhánh
+------------------------------------------------------------
+CREATE TABLE Users (
+    UserId INT IDENTITY(1,1) PRIMARY KEY,
+    UserName NVARCHAR(100) NOT NULL UNIQUE,
+    PasswordHash NVARCHAR(200) NOT NULL,
+    GivenName NVARCHAR(200) NOT NULL,
+    [Address] NVARCHAR(500) NULL,
+    MobilePhone NVARCHAR(50) NULL,
+    Email NVARCHAR(200) NULL,
+    Description NVARCHAR(500) NULL,
+    BranchId INT NULL,         -- NULL = tổng công ty
+    [Role] TINYINT NOT NULL,   -- 1,2,3
+    BirthDate DATE NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CONSTRAINT FK_Users_Branches FOREIGN KEY (BranchId)
+        REFERENCES Branches(Id),
+    CONSTRAINT CK_Users_Role CHECK ([Role] IN (1,2,3))
+);
+GO
+
+------------------------------------------------------------
+-- 4. Categories
+------------------------------------------------------------
+CREATE TABLE Categories (
+    CategoryId INT IDENTITY(1,1) PRIMARY KEY,
+    CategoryName NVARCHAR(200) NOT NULL,
+    ParentId INT NULL,
+    [Description] NVARCHAR(500) NULL,
+    [Rank] INT NULL,
+    IsDeleted BIT NOT NULL DEFAULT 0,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CONSTRAINT FK_Categories_Parent FOREIGN KEY (ParentId)
+        REFERENCES Categories(CategoryId)
+);
+GO
+
+------------------------------------------------------------
+-- 5. Products + thuộc tính
+------------------------------------------------------------
+CREATE TABLE Products (
+    ProductId INT IDENTITY(1,1) PRIMARY KEY,
+    Code NVARCHAR(100) NOT NULL UNIQUE,
+    Name NVARCHAR(200) NOT NULL,
+    CategoryId INT NULL,
+    BasePrice DECIMAL(18,2) NOT NULL DEFAULT 0,
+    RetailPrice DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Weight DECIMAL(18,3) NULL,
+    Unit NVARCHAR(50) NULL,
+    AllowsSale BIT NOT NULL DEFAULT 1,
+    [Status] NVARCHAR(20) NOT NULL DEFAULT 'Active',
+    [Description] NVARCHAR(MAX) NULL,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CONSTRAINT FK_Products_Categories FOREIGN KEY (CategoryId)
+        REFERENCES Categories(CategoryId)
+);
+GO
+
+CREATE TABLE ProductAttributes (
+    ProductAttributeId INT IDENTITY(1,1) PRIMARY KEY,
+    ProductId INT NOT NULL,
+    AttributeName NVARCHAR(100) NOT NULL,
+    AttributeValue NVARCHAR(200) NOT NULL,
+    CONSTRAINT FK_ProductAttributes_Products FOREIGN KEY (ProductId)
+        REFERENCES Products(ProductId)
+);
+GO
+
+------------------------------------------------------------
+-- 6. Product Inventories (tồn kho tổng & chi nhánh)
+------------------------------------------------------------
+CREATE TABLE ProductInventories (
+    ProductInventoryId INT IDENTITY(1,1) PRIMARY KEY,
+    ProductId INT NOT NULL,
+    BranchId INT NULL,
+    WarehouseId INT NULL,
+    OnHand INT NOT NULL DEFAULT 0,
+    Reserved INT NOT NULL DEFAULT 0,
+    Available AS (OnHand - Reserved),
+    LastUpdated DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_ProductInventories_Products FOREIGN KEY (ProductId)
+        REFERENCES Products(ProductId),
+    CONSTRAINT FK_ProductInventories_Branches FOREIGN KEY (BranchId)
+        REFERENCES Branches(Id),
+    CONSTRAINT FK_ProductInventories_Warehouses FOREIGN KEY (WarehouseId)
+        REFERENCES Warehouses(WarehouseId),
+    CONSTRAINT CK_ProductInventories_Location CHECK (
+        (BranchId IS NOT NULL AND WarehouseId IS NULL)
+        OR (BranchId IS NULL AND WarehouseId IS NOT NULL)
+    )
+);
+GO
+
+------------------------------------------------------------
+-- 7. Customers
+------------------------------------------------------------
+CREATE TABLE Customers (
+    CustomerId INT IDENTITY(1,1) PRIMARY KEY,
+    Code NVARCHAR(50) NULL,
+    Name NVARCHAR(200) NOT NULL,
+    [Type] TINYINT NULL,            -- 0 cá nhân, 1 DN
+    Gender BIT NULL,
+    BirthDate DATE NULL,
+    ContactNumber NVARCHAR(50) NULL,
+    [Address] NVARCHAR(500) NULL,
+    WardName NVARCHAR(200) NULL,
+    LocationName NVARCHAR(200) NULL,
+    Email NVARCHAR(200) NULL,
+    Organization NVARCHAR(200) NULL,
+    Comments NVARCHAR(500) NULL,
+    TaxCode NVARCHAR(100) NULL,
+    Debt DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalInvoiced DECIMAL(18,2) NULL,
+    TotalPoint DECIMAL(18,2) NULL,
+    TotalRevenue DECIMAL(18,2) NULL,
+    BranchId INT NULL,
+    CreatedBy NVARCHAR(100) NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CONSTRAINT FK_Customers_Branches FOREIGN KEY (BranchId)
+        REFERENCES Branches(Id)
+);
+GO
+
+CREATE TABLE CustomerGroups (
+    CustomerGroupId INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(200) NOT NULL,
+    [Description] NVARCHAR(500) NULL
+);
+GO
+
+CREATE TABLE CustomerGroupDetails (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    CustomerId INT NOT NULL,
+    CustomerGroupId INT NOT NULL,
+    CONSTRAINT FK_CustGroupDetails_Customers FOREIGN KEY (CustomerId)
+        REFERENCES Customers(CustomerId),
+    CONSTRAINT FK_CustGroupDetails_CustomerGroups FOREIGN KEY (CustomerGroupId)
+        REFERENCES CustomerGroups(CustomerGroupId)
+);
+GO
+
+------------------------------------------------------------
+-- 8. Suppliers
+------------------------------------------------------------
+CREATE TABLE Suppliers (
+    SupplierId INT IDENTITY(1,1) PRIMARY KEY,
+    Code NVARCHAR(50) NOT NULL,
+    Name NVARCHAR(200) NOT NULL,
+    ContactNumber NVARCHAR(50) NULL,
+    Email NVARCHAR(200) NULL,
+    [Address] NVARCHAR(500) NULL,
+    WardName NVARCHAR(200) NULL,
+    Organization NVARCHAR(200) NULL,
+    TaxCode NVARCHAR(100) NULL,
+    Comments NVARCHAR(500) NULL,
+    [Description] NVARCHAR(500) NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    BranchId INT NULL,
+    Debt DECIMAL(18,2) NULL,
+    TotalInvoiced DECIMAL(18,2) NULL,
+    CreatedBy NVARCHAR(100) NULL,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CONSTRAINT FK_Suppliers_Branches FOREIGN KEY (BranchId)
+        REFERENCES Branches(Id)
+);
+GO
+
+------------------------------------------------------------
+-- 9. Bảng trạng thái dùng chung
+------------------------------------------------------------
+CREATE TABLE Status (
+    StatusId INT IDENTITY(1,1) PRIMARY KEY,
+    EntityType NVARCHAR(100) NOT NULL,   -- 'Order', 'Invoice', 'PurchaseOrder',...
+    Code NVARCHAR(50) NOT NULL,          -- 'DRAFT', 'COMPLETED',...
+    Name NVARCHAR(200) NOT NULL,
+    [Description] NVARCHAR(500) NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CONSTRAINT UQ_Status_EntityType_Code UNIQUE (EntityType, Code)
+);
+GO
+
+------------------------------------------------------------
+-- 10. Nhập kho (PurchaseOrders) - dùng kho tổng
+------------------------------------------------------------
+CREATE TABLE PurchaseOrders (
+    PurchaseOrderId INT IDENTITY(1,1) PRIMARY KEY,
+    Code NVARCHAR(50) NOT NULL,
+    DocumentCode NVARCHAR(50) NULL,
+    PurchaseDate DATETIME2 NOT NULL,
+    ExpectedDeliveryDate DATETIME2 NULL,
+    DeliveryDate DATETIME2 NULL,
+    WarehouseId INT NOT NULL,
+    SupplierId INT NULL,
+    Total DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalPayment DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Discount DECIMAL(18,2) NULL,
+    DiscountRatio DECIMAL(5,2) NULL,
+    [Description] NVARCHAR(500) NULL,
+    StatusId INT NULL,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CONSTRAINT FK_PurchaseOrders_Warehouses FOREIGN KEY (WarehouseId)
+        REFERENCES Warehouses(WarehouseId),
+    CONSTRAINT FK_PurchaseOrders_Suppliers FOREIGN KEY (SupplierId)
+        REFERENCES Suppliers(SupplierId),
+    CONSTRAINT FK_PurchaseOrders_Status FOREIGN KEY (StatusId)
+        REFERENCES Status(StatusId)
+);
+GO
+
+CREATE TABLE PurchaseOrderDetails (
+    PurchaseOrderDetailId INT IDENTITY(1,1) PRIMARY KEY,
+    PurchaseOrderId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity INT NOT NULL,
+    UnitPrice DECIMAL(18,2) NOT NULL,
+    Discount DECIMAL(18,2) NULL,
+    CONSTRAINT FK_PODetails_PO FOREIGN KEY (PurchaseOrderId)
+        REFERENCES PurchaseOrders(PurchaseOrderId),
+    CONSTRAINT FK_PODetails_Products FOREIGN KEY (ProductId)
+        REFERENCES Products(ProductId)
+);
+GO
+
+------------------------------------------------------------
+-- 11. Điều chuyển kho tổng -> chi nhánh
+------------------------------------------------------------
+CREATE TABLE StockTransfers (
+    StockTransferId INT IDENTITY(1,1) PRIMARY KEY,
+    TransferCode NVARCHAR(50) NOT NULL,
+    FromWarehouseId INT NOT NULL,
+    ToBranchId INT NOT NULL,
+    TransferDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    [Description] NVARCHAR(500) NULL,
+    StatusId INT NULL,
+    CreatedBy INT NULL,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_StockTransfers_FromWarehouse FOREIGN KEY (FromWarehouseId)
+        REFERENCES Warehouses(WarehouseId),
+    CONSTRAINT FK_StockTransfers_ToBranch FOREIGN KEY (ToBranchId)
+        REFERENCES Branches(Id),
+    CONSTRAINT FK_StockTransfers_Users FOREIGN KEY (CreatedBy)
+        REFERENCES Users(UserId),
+    CONSTRAINT FK_StockTransfers_Status FOREIGN KEY (StatusId)
+        REFERENCES Status(StatusId)
+);
+GO
+
+CREATE TABLE StockTransferDetails (
+    StockTransferDetailId INT IDENTITY(1,1) PRIMARY KEY,
+    StockTransferId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity INT NOT NULL,
+    CONSTRAINT FK_STDetails_StockTransfers FOREIGN KEY (StockTransferId)
+        REFERENCES StockTransfers(StockTransferId),
+    CONSTRAINT FK_STDetails_Products FOREIGN KEY (ProductId)
+        REFERENCES Products(ProductId)
+);
+GO
+
+------------------------------------------------------------
+-- 12. Trả hàng từ chi nhánh về kho tổng
+------------------------------------------------------------
+CREATE TABLE StockReturns (
+    StockReturnId INT IDENTITY(1,1) PRIMARY KEY,
+    ReturnCode NVARCHAR(50) NOT NULL,
+    FromBranchId INT NOT NULL,
+    ToWarehouseId INT NOT NULL,
+    ReturnDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    Reason NVARCHAR(500) NULL,
+    StatusId INT NULL,
+    CreatedBy INT NULL,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_StockReturns_Branch FOREIGN KEY (FromBranchId)
+        REFERENCES Branches(Id),
+    CONSTRAINT FK_StockReturns_Warehouse FOREIGN KEY (ToWarehouseId)
+        REFERENCES Warehouses(WarehouseId),
+    CONSTRAINT FK_StockReturns_User FOREIGN KEY (CreatedBy)
+        REFERENCES Users(UserId),
+    CONSTRAINT FK_StockReturns_Status FOREIGN KEY (StatusId)
+        REFERENCES Status(StatusId)
+);
+GO
+
+CREATE TABLE StockReturnDetails (
+    StockReturnDetailId INT IDENTITY(1,1) PRIMARY KEY,
+    StockReturnId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity INT NOT NULL,
+    ExpiredDate DATE NULL,
+    CONSTRAINT FK_SRDetails_StockReturns FOREIGN KEY (StockReturnId)
+        REFERENCES StockReturns(StockReturnId),
+    CONSTRAINT FK_SRDetails_Products FOREIGN KEY (ProductId)
+        REFERENCES Products(ProductId)
+);
+GO
+
+------------------------------------------------------------
+-- 13. Đề xuất nhập từ chi nhánh
+------------------------------------------------------------
+CREATE TABLE ReplenishmentRequests (
+    ReplenishmentRequestId INT IDENTITY(1,1) PRIMARY KEY,
+    RequestCode NVARCHAR(50) NOT NULL,
+    BranchId INT NOT NULL,
+    RequestDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    [Description] NVARCHAR(500) NULL,
+    StatusId INT NULL,
+    CreatedBy INT NULL,
+    CONSTRAINT FK_ReplenishmentRequests_Branch FOREIGN KEY (BranchId)
+        REFERENCES Branches(Id),
+    CONSTRAINT FK_ReplenishmentRequests_User FOREIGN KEY (CreatedBy)
+        REFERENCES Users(UserId),
+    CONSTRAINT FK_ReplenishmentRequests_Status FOREIGN KEY (StatusId)
+        REFERENCES Status(StatusId)
+);
+GO
+
+CREATE TABLE ReplenishmentRequestDetails (
+    ReplenishmentRequestDetailId INT IDENTITY(1,1) PRIMARY KEY,
+    ReplenishmentRequestId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity INT NOT NULL,
+    CONSTRAINT FK_RRDetails_ReplenishmentRequests FOREIGN KEY (ReplenishmentRequestId)
+        REFERENCES ReplenishmentRequests(ReplenishmentRequestId),
+    CONSTRAINT FK_RRDetails_Products FOREIGN KEY (ProductId)
+        REFERENCES Products(ProductId)
+);
+GO
+
+------------------------------------------------------------
+-- 14. Orders (bán hàng POS)
+------------------------------------------------------------
+CREATE TABLE Orders (
+    OrderId INT IDENTITY(1,1) PRIMARY KEY,
+    Code NVARCHAR(50) NOT NULL,
+    PurchaseDate DATETIME2 NOT NULL,
+    BranchId INT NOT NULL,
+    CustomerId INT NULL,
+    Total DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalPayment DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Discount DECIMAL(18,2) NULL,
+    DiscountRatio DECIMAL(5,2) NULL,
+    [Description] NVARCHAR(500) NULL,
+    UsingCOD BIT NOT NULL DEFAULT 0,
+    StatusId INT NULL,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CreatedBy INT NULL,
+    CONSTRAINT FK_Orders_Branches FOREIGN KEY (BranchId)
+        REFERENCES Branches(Id),
+    CONSTRAINT FK_Orders_Customers FOREIGN KEY (CustomerId)
+        REFERENCES Customers(CustomerId),
+    CONSTRAINT FK_Orders_Users FOREIGN KEY (CreatedBy)
+        REFERENCES Users(UserId),
+    CONSTRAINT FK_Orders_Status FOREIGN KEY (StatusId)
+        REFERENCES Status(StatusId)
+);
+GO
+
+CREATE TABLE OrderDetails (
+    OrderDetailId INT IDENTITY(1,1) PRIMARY KEY,
+    OrderId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity INT NOT NULL,
+    UnitPrice DECIMAL(18,2) NOT NULL,
+    Discount DECIMAL(18,2) NULL,
+    CONSTRAINT FK_OrderDetails_Orders FOREIGN KEY (OrderId)
+        REFERENCES Orders(OrderId),
+    CONSTRAINT FK_OrderDetails_Products FOREIGN KEY (ProductId)
+        REFERENCES Products(ProductId)
+);
+GO
+
+------------------------------------------------------------
+-- 15. Invoices (nếu muốn tách hóa đơn)
+------------------------------------------------------------
+CREATE TABLE Invoices (
+    InvoiceId INT IDENTITY(1,1) PRIMARY KEY,
+    Code NVARCHAR(50) NOT NULL,
+    OrderId INT NULL,
+    PurchaseDate DATETIME2 NOT NULL,
+    BranchId INT NOT NULL,
+    CustomerId INT NULL,
+    Total DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalPayment DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Discount DECIMAL(18,2) NULL,
+    DiscountRatio DECIMAL(5,2) NULL,
+    [Description] NVARCHAR(500) NULL,
+    UsingCOD BIT NOT NULL DEFAULT 0,
+    StatusId INT NULL,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedDate DATETIME2 NULL,
+    CreatedBy INT NULL,
+    CONSTRAINT FK_Invoices_Branches FOREIGN KEY (BranchId)
+        REFERENCES Branches(Id),
+    CONSTRAINT FK_Invoices_Customers FOREIGN KEY (CustomerId)
+        REFERENCES Customers(CustomerId),
+    CONSTRAINT FK_Invoices_Orders FOREIGN KEY (OrderId)
+        REFERENCES Orders(OrderId),
+    CONSTRAINT FK_Invoices_Users FOREIGN KEY (CreatedBy)
+        REFERENCES Users(UserId),
+    CONSTRAINT FK_Invoices_Status FOREIGN KEY (StatusId)
+        REFERENCES Status(StatusId)
+);
+GO
+
+CREATE TABLE InvoiceDetails (
+    InvoiceDetailId INT IDENTITY(1,1) PRIMARY KEY,
+    InvoiceId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity INT NOT NULL,
+    UnitPrice DECIMAL(18,2) NOT NULL,
+    Discount DECIMAL(18,2) NULL,
+    CONSTRAINT FK_InvoiceDetails_Invoices FOREIGN KEY (InvoiceId)
+        REFERENCES Invoices(InvoiceId),
+    CONSTRAINT FK_InvoiceDetails_Products FOREIGN KEY (ProductId)
+        REFERENCES Products(ProductId)
+);
+GO
+
+------------------------------------------------------------
+-- 16. Voucher campaigns & vouchers
+------------------------------------------------------------
+CREATE TABLE VoucherCampaigns (
+    VoucherCampaignId INT IDENTITY(1,1) PRIMARY KEY,
+    Code NVARCHAR(50) NOT NULL,
+    Name NVARCHAR(200) NOT NULL,
+    [Description] NVARCHAR(500) NULL,
+    StartDate DATETIME2 NOT NULL,
+    EndDate DATETIME2 NOT NULL,
+    StatusId INT NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    BranchId INT NULL,
+    DiscountType TINYINT NOT NULL,        -- 1=fixed, 2=percent
+    DiscountValue DECIMAL(18,2) NOT NULL,
+    MinOrderValue DECIMAL(18,2) NULL,
+    MaxDiscountValue DECIMAL(18,2) NULL,
+    Quantity INT NOT NULL DEFAULT 0,
+    UsedQuantity INT NOT NULL DEFAULT 0,
+    RemainingQuantity INT NOT NULL DEFAULT 0,
+    IsAutoGenerate BIT NOT NULL DEFAULT 0,
+    IsUnlimited BIT NOT NULL DEFAULT 0,
+    CreatedDate DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_VoucherCampaigns_Branches FOREIGN KEY (BranchId)
+        REFERENCES Branches(Id),
+    CONSTRAINT FK_VoucherCampaigns_Status FOREIGN KEY (StatusId)
+        REFERENCES Status(StatusId)
+);
+GO
+
+CREATE TABLE Vouchers (
+    VoucherId INT IDENTITY(1,1) PRIMARY KEY,
+    Code NVARCHAR(50) NOT NULL,
+    VoucherCampaignId INT NOT NULL,
+    StartDate DATETIME2 NOT NULL,
+    EndDate DATETIME2 NOT NULL,
+    StatusId INT NULL,
+    IsUsed BIT NOT NULL DEFAULT 0,
+    UsedDate DATETIME2 NULL,
+    CustomerId INT NULL,
+    OrderId INT NULL,
+    DiscountValue DECIMAL(18,2) NOT NULL,
+    CONSTRAINT FK_Vouchers_Campaign FOREIGN KEY (VoucherCampaignId)
+        REFERENCES VoucherCampaigns(VoucherCampaignId),
+    CONSTRAINT FK_Vouchers_Customers FOREIGN KEY (CustomerId)
+        REFERENCES Customers(CustomerId),
+    CONSTRAINT FK_Vouchers_Orders FOREIGN KEY (OrderId)
+        REFERENCES Orders(OrderId),
+    CONSTRAINT FK_Vouchers_Status FOREIGN KEY (StatusId)
+        REFERENCES Status(StatusId)
+);
+GO
+
+------------------------------------------------------------
+-- 17. Inventory Audits (kiểm kê bằng mobile quét mã)
+------------------------------------------------------------
+CREATE TABLE InventoryAudits (
+    InventoryAuditId INT IDENTITY(1,1) PRIMARY KEY,
+    BranchId INT NOT NULL,
+    ProductId INT NOT NULL,
+    SystemQty INT NOT NULL,
+    CountedQty INT NOT NULL,
+    Difference AS (CountedQty - SystemQty),
+    ScanTime DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ScannedBy INT NULL,
+    CONSTRAINT FK_InventoryAudits_Branches FOREIGN KEY (BranchId)
+        REFERENCES Branches(Id),
+    CONSTRAINT FK_InventoryAudits_Products FOREIGN KEY (ProductId)
+        REFERENCES Products(ProductId),
+    CONSTRAINT FK_InventoryAudits_Users FOREIGN KEY (ScannedBy)
+        REFERENCES Users(UserId)
+);
+GO
+
+------------------------------------------------------------
+-- 18. Seed dữ liệu cho bảng Status
+------------------------------------------------------------
+-- Orders
+INSERT INTO Status (EntityType, Code, Name) VALUES
+('Order', 'DRAFT', N'Nháp'),
+('Order', 'PROCESSING', N'Đang xử lý'),
+('Order', 'COMPLETED', N'Hoàn thành'),
+('Order', 'CANCELLED', N'Đã hủy');
+
+-- Invoices
+INSERT INTO Status (EntityType, Code, Name) VALUES
+('Invoice', 'DRAFT', N'Nháp'),
+('Invoice', 'PROCESSING', N'Đang xử lý'),
+('Invoice', 'COMPLETED', N'Hoàn thành'),
+('Invoice', 'CANCELLED', N'Đã hủy');
+
+-- Purchase Orders
+INSERT INTO Status (EntityType, Code, Name) VALUES
+('PurchaseOrder', 'DRAFT', N'Nháp'),
+('PurchaseOrder', 'APPROVED', N'Đã duyệt'),
+('PurchaseOrder', 'RECEIVED', N'Đã nhận hàng'),
+('PurchaseOrder', 'CANCELLED', N'Đã hủy');
+
+-- Stock Transfers
+INSERT INTO Status (EntityType, Code, Name) VALUES
+('StockTransfer', 'DRAFT', N'Nháp'),
+('StockTransfer', 'IN_TRANSIT', N'Đang vận chuyển'),
+('StockTransfer', 'COMPLETED', N'Đã hoàn tất');
+
+-- Stock Returns
+INSERT INTO Status (EntityType, Code, Name) VALUES
+('StockReturn', 'DRAFT', N'Nháp'),
+('StockReturn', 'APPROVED', N'Đã duyệt'),
+('StockReturn', 'COMPLETED', N'Hoàn tất');
+
+-- Replenishment Requests
+INSERT INTO Status (EntityType, Code, Name) VALUES
+('Replenishment', 'NEW', N'Mới tạo'),
+('Replenishment', 'APPROVED', N'Đã duyệt'),
+('Replenishment', 'REJECTED', N'Bị từ chối');
+
+-- Voucher Campaign
+INSERT INTO Status (EntityType, Code, Name) VALUES
+('VoucherCampaign', 'ACTIVE', N'Đang hoạt động'),
+('VoucherCampaign', 'INACTIVE', N'Ngưng'),
+('VoucherCampaign', 'EXPIRED', N'Hết hạn');
+
+-- Voucher
+INSERT INTO Status (EntityType, Code, Name) VALUES
+('Voucher', 'ACTIVE', N'Đang hoạt động'),
+('Voucher', 'USED', N'Đã dùng'),
+('Voucher', 'EXPIRED', N'Hết hạn');
+GO
+
+------------------------------------------------------------
+-- 19. Thêm kho tổng mẫu
+------------------------------------------------------------
+INSERT INTO Warehouses (Name, [Address]) VALUES (N'Kho tổng', N'Địa chỉ kho tổng');
+GO
