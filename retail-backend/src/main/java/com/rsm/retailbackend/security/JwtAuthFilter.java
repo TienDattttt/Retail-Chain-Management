@@ -40,13 +40,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String username = jwtUtils.extractUsername(token);
                 String role = jwtUtils.extractRole(token);
 
-                // 🧩 Map role trong JWT (1,2,3) -> authority tương ứng
                 String authority = switch (role) {
-                    case "1" -> "ROLE_ADMIN";
-                    case "2" -> "ROLE_MANAGER";
-                    case "3" -> "ROLE_STAFF";
-                    default -> "ROLE_UNKNOWN";
+                    case "1" -> "1";       // ADMIN
+                    case "2" -> "2";       // MANAGER
+                    case "3" -> "3";       // STAFF
+                    default -> "UNKNOWN";
                 };
+
 
                 GrantedAuthority grantedAuthority = new SimpleGrantedAuthority(authority);
                 User principal = new User(username, "", List.of(grantedAuthority));

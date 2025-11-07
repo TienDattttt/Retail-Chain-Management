@@ -1,11 +1,18 @@
+
 package com.rsm.retailbackend.feature.common.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Getter
+@Data
+@NoArgsConstructor
 @AllArgsConstructor
 public class MessageResponse {
     private String message;
     private Object data;
+
+    public MessageResponse(String message) {
+        this.message = message;
+    }
 }

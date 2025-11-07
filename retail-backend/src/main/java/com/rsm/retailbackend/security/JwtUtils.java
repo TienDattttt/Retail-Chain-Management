@@ -39,7 +39,9 @@ public class JwtUtils {
 
     // Lấy role từ token
     public String extractRole(String token) {
-        return parseClaims(token).getBody().get("role", String.class);
+        Object roleObj = parseClaims(token).getBody().get("role");
+        return roleObj != null ? roleObj.toString() : null;
+
     }
 
     // Kiểm tra hợp lệ

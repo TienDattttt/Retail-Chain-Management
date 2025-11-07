@@ -3,6 +3,7 @@ package com.rsm.retailbackend.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -12,6 +13,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
@@ -37,6 +39,17 @@ public class SecurityConfig {
                         // chỉ admin tổng mới được xem hoặc duyệt user
                         .requestMatchers(HttpMethod.GET, "/api/users/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/users/**").hasRole("ADMIN")
+
+
+                        .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/categories/upsert").hasAuthority("1")
+                        .requestMatchers(HttpMethod.POST, "/api/suppliers/upsert").hasAuthority("1")
+                        .requestMatchers(HttpMethod.POST, "/api/voucher-campaigns/upsert").hasAuthority("1") // đúng path
+                        .requestMatchers(HttpMethod.POST, "/api/vouchers/upsert").hasAuthority("1")
+                        .requestMatchers(HttpMethod.POST, "/api/products/upsert").hasAuthority("1")
+                        .requestMatchers(HttpMethod.POST, "/api/products/bulk-create").hasAuthority("1")
+                        .requestMatchers(HttpMethod.POST, "/api/products/bulk-update").hasAuthority("1")
+
 
 
                         // còn lại phải đăng nhập
