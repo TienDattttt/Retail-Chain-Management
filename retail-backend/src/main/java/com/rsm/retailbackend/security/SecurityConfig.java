@@ -25,6 +25,11 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         // cho phép đăng nhập / đăng ký
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/profile/**").authenticated()

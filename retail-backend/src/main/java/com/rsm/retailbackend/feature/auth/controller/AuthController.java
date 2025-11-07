@@ -7,6 +7,9 @@ import com.rsm.retailbackend.feature.auth.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
+@SecurityRequirement(name = "bearerAuth")
 
 @RestController
 @RequestMapping("/api/auth")
