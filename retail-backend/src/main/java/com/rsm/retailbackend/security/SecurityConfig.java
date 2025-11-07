@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/products/upsert").hasAuthority("1")
                         .requestMatchers(HttpMethod.POST, "/api/products/bulk-create").hasAuthority("1")
                         .requestMatchers(HttpMethod.POST, "/api/products/bulk-update").hasAuthority("1")
+                        .requestMatchers(HttpMethod.POST, "/api/branches/upsert").hasAuthority("1")
 
 
 
