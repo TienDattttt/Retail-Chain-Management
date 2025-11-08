@@ -27,10 +27,6 @@ public class Invoice {
     @Column(name = "Code", nullable = false, length = 50)
     private String code;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "OrderId")
-    private Order order;
-
     @NotNull
     @Column(name = "PurchaseDate", nullable = false)
     private Instant purchaseDate;

@@ -52,6 +52,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/branches/upsert").hasAuthority("1")
 
 
+                        .requestMatchers("/api/momo/**").permitAll()
+
+
 
                         // còn lại phải đăng nhập
                         .anyRequest().authenticated()

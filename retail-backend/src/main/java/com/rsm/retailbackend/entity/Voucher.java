@@ -28,11 +28,6 @@ public class Voucher {
     private String code;
 
     @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "VoucherCampaignId", nullable = false)
-    private VoucherCampaign voucherCampaign;
-
-    @NotNull
     @Column(name = "StartDate", nullable = false)
     private Instant startDate;
 
@@ -56,12 +51,16 @@ public class Voucher {
     @JoinColumn(name = "CustomerId")
     private Customer customer;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "OrderId")
-    private Order order;
-
     @NotNull
     @Column(name = "DiscountValue", nullable = false, precision = 18, scale = 2)
     private BigDecimal discountValue;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "InvoiceId")
+    private Invoice invoice;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "VoucherCampaignId")
+    private VoucherCampaign voucherCampaign;
 
 }

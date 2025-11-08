@@ -51,7 +51,7 @@ public class VoucherServiceImpl implements VoucherService {
         dto.setIsUsed(v.getIsUsed());
         dto.setUsedDate(v.getUsedDate());
         dto.setCustomerId(v.getCustomer() != null ? v.getCustomer().getId() : null);
-        dto.setOrderId(v.getOrder() != null ? v.getOrder().getId() : null);
+        dto.setOrderId(v.getInvoice() != null ? v.getInvoice().getId() : null);
         dto.setDiscountValue(v.getDiscountValue());
         return dto;
     }
