@@ -24,11 +24,26 @@ public class SaleController {
     public ResponseEntity<Map<String, Object>> processSale(@RequestBody SaleRequest request) {
         Invoice invoice = saleService.processSale(request);
 
-        return ResponseEntity.ok(Map.of(
-                "message", "Thanh toán tiền mặt thành công",
-                "invoiceId", invoice.getId(),
-                "invoiceCode", invoice.getCode(),
-                "status", invoice.getStatus().getCode()
-        ));
+        String method = request.getPaymentMethod().toUpperCase();
+        String message = switch (method) {
+            case "CASH" -> "Thanh toán tiền mặt thành công";
+            case "MOMO" -> "Tạo giao dịch MoMo thành công, chờ người dùng thanh toán";
+            case "VNPAY" -> "Tạo giao dịch VNPAY thành công, chờ người dùng thanh toán";
+            default -> "Phương thức thanh toán không xác định";
+        };
+
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("message", message);
+        response.put("invoiceId", invoice.getId());
+        response.put("invoiceCode", invoice.getCode());
+        response.put("status", invoice.getStatus().getCode());
+
+        // Nếu là MoMo → trả thêm payUrl để FE redirect
+        if ("MOMO".equalsIgnoreCase(method)) {
+            response.put("payUrl", invoice.getDescription()); // hoặc lưu payUrl vào Payment, rồi lấy ở đây
+        }
+
+        return ResponseEntity.ok(response);
     }
+
 }

@@ -9,6 +9,8 @@ import com.rsm.retailbackend.feature.sales.dto.SaleRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
+
 @Service
 @Transactional
 public class SaleServiceImpl implements SaleService {
@@ -27,9 +29,8 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     public Invoice processSale(SaleRequest request) {
-        System.out.println("🧾 Bắt đầu xử lý bán hàng cho mã: " + request.getCode());
+        System.out.println("Bắt đầu xử lý bán hàng cho mã: " + request.getCode());
 
-        // Tạo hóa đơn + chi tiết hóa đơn
         Invoice invoice = invoiceService.createInvoice(
                 request.getCode(),
                 request.getBranchId(),
@@ -44,18 +45,29 @@ public class SaleServiceImpl implements SaleService {
                 request.getDetails()
         );
 
-        // Nếu thanh toán tiền mặt → tạo payment & trừ tồn kho
-        if ("CASH".equalsIgnoreCase(request.getPaymentMethod())) {
-            paymentService.createPayment(invoice.getId(), request.getTotalPayment(), "CASH", request.getCreatedBy());
+        String method = request.getPaymentMethod().toUpperCase();
 
-            for (InvoiceDetail d : request.getDetails()) {
-                inventoryService.deductInventoryForSale(request.getBranchId(), d.getProduct().getId(), d.getQuantity());
+        switch (method) {
+            case "CASH" -> {
+                paymentService.createPayment(invoice.getId(), request.getTotalPayment(), "CASH", request.getCreatedBy());
+                for (InvoiceDetail d : request.getDetails()) {
+                    inventoryService.deductInventoryForSale(request.getBranchId(), d.getProduct().getId(), d.getQuantity());
+                }
+                System.out.printf("Hoàn tất thanh toán tiền mặt cho hóa đơn %s%n", invoice.getCode());
             }
+            case "MOMO" -> {
+                Map<String, Object> momoResult = (Map<String, Object>)
+                        paymentService.createPayment(invoice.getId(), request.getTotalPayment(), "MOMO", request.getCreatedBy());
 
-            System.out.printf("Hoàn tất thanh toán tiền mặt cho hóa đơn %s%n", request.getCode());
+                String payUrl = (String) momoResult.get("payUrl");
+                invoice.setDescription(payUrl); // Lưu tạm để controller dùng
+                System.out.printf("Đang chờ thanh toán MoMo cho hóa đơn %s (PaymentId=%s)%n",
+                        invoice.getCode(), momoResult.get("paymentId"));
+            }
+            default -> throw new IllegalArgumentException("Phương thức thanh toán không hợp lệ: " + method);
         }
 
-        // Các phương thức MOMO/VNPAY sẽ xử lý callback sau
         return invoice;
     }
+
 }
