@@ -4,11 +4,14 @@ import com.rsm.retailbackend.entity.Invoice;
 import com.rsm.retailbackend.entity.InvoiceDetail;
 import com.rsm.retailbackend.feature.invoice.repository.InvoiceDetailRepository;
 import com.rsm.retailbackend.feature.invoice.repository.InvoiceRepository;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -41,6 +44,10 @@ public class InvoiceServiceImpl implements InvoiceService {
                                  Integer createdBy,
                                  List<InvoiceDetail> details) {
 
+        if (code == null || code.isBlank()) {
+            code = generateInvoiceCode();
+        }
+
         // 1️⃣ Gọi stored procedure tạo hóa đơn
         String sql = "EXEC sp_CreateInvoiceWithDetails @Code=?, @BranchId=?, @CustomerId=?, " +
                 "@Total=?, @TotalPayment=?, @Discount=?, @DiscountRatio=?, " +
@@ -67,5 +74,27 @@ public class InvoiceServiceImpl implements InvoiceService {
                 code, statusId, paymentMethod);
 
         return invoice;
+    }
+
+    private String generateInvoiceCode() {
+        String prefix = "INV" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-";
+        int nextNumber = 1;
+
+        try {
+            // Lấy mã mới nhất trong ngày
+            String lastCode = jdbcTemplate.queryForObject(
+                    "SELECT TOP 1 Code FROM Invoices WHERE Code LIKE ? ORDER BY Code DESC",
+                    String.class,
+                    prefix + "%"
+            );
+
+            if (lastCode != null && lastCode.contains("-")) {
+                String lastNumberStr = lastCode.substring(lastCode.lastIndexOf('-') + 1);
+                nextNumber = Integer.parseInt(lastNumberStr) + 1;
+            }
+        } catch (EmptyResultDataAccessException ignored) {
+        }
+
+        return prefix + String.format("%03d", nextNumber);
     }
 }
