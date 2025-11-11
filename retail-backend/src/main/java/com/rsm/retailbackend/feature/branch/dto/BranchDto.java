@@ -1,6 +1,8 @@
 package com.rsm.retailbackend.feature.branch.dto;
 
 import lombok.*;
+
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Getter
@@ -25,4 +27,7 @@ public class BranchDto {
     private String createdBy;
     private Instant createdDate;
     private Instant modifiedDate;
+    private BigDecimal latitude;
+    private BigDecimal longitude;
+
 }

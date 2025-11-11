@@ -1,0 +1,2 @@
+MOMO_RETURN_URL=https://unvulgar-royalistic-barbie.ngrok-free.dev/api/momo/return
+MOMO_IPN_URL=https://unvulgar-royalistic-barbie.ngrok-free.dev/api/momo/ipn-handler

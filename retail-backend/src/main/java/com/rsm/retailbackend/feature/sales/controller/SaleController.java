@@ -38,9 +38,9 @@ public class SaleController {
         response.put("invoiceCode", invoice.getCode());
         response.put("status", invoice.getStatus().getCode());
 
-        // Nếu là MoMo → trả thêm payUrl để FE redirect
+
         if ("MOMO".equalsIgnoreCase(method)) {
-            response.put("payUrl", invoice.getDescription()); // hoặc lưu payUrl vào Payment, rồi lấy ở đây
+            response.put("payUrl", invoice.getDescription());
         }
 
         return ResponseEntity.ok(response);

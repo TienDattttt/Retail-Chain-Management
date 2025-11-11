@@ -44,7 +44,7 @@ public class InvoicePrintController {
             PdfWriter.getInstance(doc, out);
             doc.open();
 
-            // ✅ Font Unicode tiếng Việt
+            //Font Unicode tiếng Việt
             BaseFont bf = BaseFont.createFont(
                     "c:/windows/fonts/arial.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
             Font titleFont = new Font(bf, 12, Font.BOLD);

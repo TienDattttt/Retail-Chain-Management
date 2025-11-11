@@ -8,6 +8,7 @@ import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Nationalized;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Getter
@@ -90,5 +91,11 @@ public class Branch {
 
     @Column(name = "ModifiedDate")
     private Instant modifiedDate;
+
+    @Column(name = "Latitude", precision = 11, scale = 8)
+    private BigDecimal latitude;
+
+    @Column(name = "Longitude", precision = 11, scale = 8)
+    private BigDecimal longitude;
 
 }
