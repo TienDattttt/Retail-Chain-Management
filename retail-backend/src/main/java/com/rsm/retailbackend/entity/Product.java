@@ -60,9 +60,12 @@ public class Product {
     @Column(name = "AllowsSale", nullable = false)
     private Boolean allowsSale = false;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "StatusId", nullable = false)
-    private Status status;
+    @Size(max = 20)
+    @NotNull
+    @Nationalized
+    @ColumnDefault("'Active'")
+    @Column(name = "Status", nullable = false, length = 20)
+    private String status;
 
     @Nationalized
     @Lob
@@ -86,5 +89,10 @@ public class Product {
     @Nationalized
     @Column(name = "ImageUrl", length = 500)
     private String imageUrl;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "StatusId", nullable = false)
+    private Status status1;
 
 }

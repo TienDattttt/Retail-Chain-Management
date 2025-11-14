@@ -78,9 +78,8 @@ public class Supplier {
     @Column(name = "IsActive", nullable = false)
     private Boolean isActive = false;
 
-    // <- cho phép null: supplier của tổng thì để null
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "BranchId", nullable = true)
+    @JoinColumn(name = "BranchId")
     private Branch branch;
 
     @Column(name = "Debt", precision = 18, scale = 2)
@@ -101,4 +100,5 @@ public class Supplier {
 
     @Column(name = "ModifiedDate")
     private Instant modifiedDate;
+
 }

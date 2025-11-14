@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -37,5 +38,12 @@ public class PurchaseOrderDetail {
 
     @Column(name = "Discount", precision = 18, scale = 2)
     private BigDecimal discount;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "BatchId")
+    private Batch batch;
+
+    @Column(name = "ExpiredDate")
+    private LocalDate expiredDate;
 
 }

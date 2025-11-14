@@ -28,6 +28,11 @@ public class Voucher {
     private String code;
 
     @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "VoucherCampaignId", nullable = false)
+    private VoucherCampaign voucherCampaign;
+
+    @NotNull
     @Column(name = "StartDate", nullable = false)
     private Instant startDate;
 
@@ -58,9 +63,5 @@ public class Voucher {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "InvoiceId")
     private Invoice invoice;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "VoucherCampaignId")
-    private VoucherCampaign voucherCampaign;
 
 }

@@ -1,6 +1,5 @@
 package com.rsm.retailbackend.feature.customer.service;
 
-import com.rsm.retailbackend.entity.Branch;
 import com.rsm.retailbackend.entity.Customer;
 import com.rsm.retailbackend.feature.customer.dto.CustomerDto;
 import com.rsm.retailbackend.feature.customer.repository.CustomerRepository;
@@ -9,10 +8,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
