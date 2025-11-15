@@ -6,3 +6,4 @@ import com.rsm.retailbackend.feature.purchase.dto.PurchaseOrderResponse;
 public interface PurchaseOrderService {
     PurchaseOrderResponse process(PurchaseOrderRequest request);
 }
+
