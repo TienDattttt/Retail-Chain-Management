@@ -50,4 +50,10 @@ public class ProductInventory {
     @Column(name = "LastUpdated", nullable = false)
     private Instant lastUpdated;
 
+    @Column(name = "MinThreshold")
+    private Integer minThreshold;
+
+    @Column(name = "ExpiryWarningDays")
+    private Integer expiryWarningDays;
+
 }
