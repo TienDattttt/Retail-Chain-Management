@@ -32,19 +32,25 @@ public class InventoryAlertServiceImpl implements InventoryAlertService {
     private static final String TYPE_NEAR_EXPIRY = "NEAR_EXPIRY";
     private static final String TYPE_EXPIRED = "EXPIRED";
 
+    // ============================================================
+    // 1) LOW STOCK
+    // ============================================================
     @Override
     public void scanLowStockAlerts() {
+
         var lowStocks = productInventoryRepository.findLowStockInventories();
+
         for (ProductInventory pi : lowStocks) {
+
             Integer productId = pi.getProduct().getId();
             Integer branchId = pi.getBranch() != null ? pi.getBranch().getId() : null;
             Integer warehouseId = pi.getWarehouse() != null ? pi.getWarehouse().getId() : null;
 
-            // tránh alert trùng
             Optional<InventoryAlert> existing =
                     alertRepository.findFirstByAlertTypeAndProduct_IdAndBranch_IdAndWarehouse_IdAndResolvedDateIsNull(
                             TYPE_LOW_STOCK, productId, branchId, warehouseId
                     );
+
             if (existing.isPresent()) continue;
 
             InventoryAlert alert = new InventoryAlert();
@@ -52,57 +58,64 @@ public class InventoryAlertServiceImpl implements InventoryAlertService {
             alert.setBranch(pi.getBranch());
             alert.setWarehouse(pi.getWarehouse());
             alert.setAlertType(TYPE_LOW_STOCK);
-            alert.setMessage(String.format("Tồn kho thấp: %s (Available=%d, Min=%d)",
+
+            alert.setMessage(String.format(
+                    "Tồn kho thấp: %s (Available=%d, Min=%d)",
                     pi.getProduct().getName(),
                     pi.getOnHand() - pi.getReserved(),
                     pi.getMinThreshold()
             ));
+
             alert.setQuantity(pi.getOnHand() - pi.getReserved());
             alert.setCreatedDate(Instant.now());
             alert.setIsRead(false);
 
             alertRepository.save(alert);
 
-            sendAlertToWs(alert);
+            //  LOW STOCK -> lotId = null, inventoryId = pi.getId()
+            sendAlertToWs(alert, null, pi.getId());
         }
     }
 
+    // ============================================================
+    // 2) EXPIRY CHECK
+    // ============================================================
     @Override
     public void scanExpiryAlerts() {
+
         LocalDate today = LocalDate.now();
 
-        // 1️ lô đã hết hạn (EXPIRED)
-        var expiredLots = lotRepository
-                .findByExpiredDateIsNotNullAndExpiredDateLessThanAndOnHandGreaterThan(today, 0);
+        var expiredLots =
+                lotRepository.findByExpiredDateIsNotNullAndExpiredDateLessThanAndOnHandGreaterThan(today, 0);
 
         for (ProductInventoryLot lot : expiredLots) {
             createExpiryAlert(lot, TYPE_EXPIRED);
-            //  xử lý hủy hàng & cập nhật tồn kho:
-            // ở bước 6 ta sẽ làm thêm endpoint/action cho FE gọi,
-            // còn Scheduler chỉ cảnh báo thôi để tránh tự xóa dữ liệu ngoài ý muốn.
         }
 
-        var nearExpiredLots = lotRepository
-                .findByExpiredDateIsNotNullAndExpiredDateLessThanEqualAndOnHandGreaterThan(
+        var nearExpiredLots =
+                lotRepository.findByExpiredDateIsNotNullAndExpiredDateLessThanEqualAndOnHandGreaterThan(
                         today.plusDays(30), 0
                 );
 
-
         for (ProductInventoryLot lot : nearExpiredLots) {
+
             var piOpt = findInventoryOfLot(lot);
             if (piOpt.isEmpty()) continue;
-            ProductInventory pi = piOpt.get();
 
+            ProductInventory pi = piOpt.get();
             Integer warningDays = pi.getExpiryWarningDays();
+
             if (warningDays == null || warningDays <= 0) continue;
 
             long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(today, lot.getExpiredDate());
+
             if (daysLeft < 0 || daysLeft > warningDays) continue;
 
             createExpiryAlert(lot, TYPE_NEAR_EXPIRY);
         }
     }
 
+    // Tìm inventory tương ứng 1 lô
     private Optional<ProductInventory> findInventoryOfLot(ProductInventoryLot lot) {
         return productInventoryRepository.findByProduct_IdAndBranch_IdAndWarehouse_Id(
                 lot.getProduct().getId(),
@@ -111,7 +124,11 @@ public class InventoryAlertServiceImpl implements InventoryAlertService {
         );
     }
 
+    // ============================================================
+    // Tạo Alert Hết hạn / Sắp hết hạn
+    // ============================================================
     private void createExpiryAlert(ProductInventoryLot lot, String type) {
+
         Integer productId = lot.getProduct().getId();
         Integer branchId = lot.getBranch() != null ? lot.getBranch().getId() : null;
         Integer warehouseId = lot.getWarehouse() != null ? lot.getWarehouse().getId() : null;
@@ -120,13 +137,19 @@ public class InventoryAlertServiceImpl implements InventoryAlertService {
                 alertRepository.findFirstByAlertTypeAndProduct_IdAndBranch_IdAndWarehouse_IdAndResolvedDateIsNull(
                         type, productId, branchId, warehouseId
                 );
+
         if (existing.isPresent()) return;
+
+        // tìm inventory
+        Optional<ProductInventory> invOpt = findInventoryOfLot(lot);
+        Integer inventoryId = invOpt.map(ProductInventory::getId).orElse(null);
 
         InventoryAlert alert = new InventoryAlert();
         alert.setProduct(lot.getProduct());
         alert.setBranch(lot.getBranch());
         alert.setWarehouse(lot.getWarehouse());
         alert.setAlertType(type);
+
         alert.setMessage(String.format(
                 "%s: %s - lô sắp/đã hết hạn (%s), tồn lô = %d",
                 type.equals(TYPE_EXPIRED) ? "Hết hạn" : "Sắp hết hạn",
@@ -134,6 +157,7 @@ public class InventoryAlertServiceImpl implements InventoryAlertService {
                 lot.getExpiredDate(),
                 lot.getOnHand()
         ));
+
         alert.setQuantity(lot.getOnHand());
         alert.setExpiredDate(lot.getExpiredDate());
         alert.setCreatedDate(Instant.now());
@@ -141,16 +165,22 @@ public class InventoryAlertServiceImpl implements InventoryAlertService {
 
         alertRepository.save(alert);
 
-        sendAlertToWs(alert);
+        sendAlertToWs(alert, lot.getId(), inventoryId);
     }
 
-    private void sendAlertToWs(InventoryAlert alert) {
+    // ============================================================
+    // Gửi WebSocket
+    // ============================================================
+    private void sendAlertToWs(InventoryAlert alert, Integer lotId, Integer inventoryId) {
+
         InventoryAlertDto dto = new InventoryAlertDto(
                 alert.getId(),
                 alert.getProduct().getId(),
                 alert.getProduct().getName(),
                 alert.getBranch() != null ? alert.getBranch().getId() : null,
                 alert.getWarehouse() != null ? alert.getWarehouse().getId() : null,
+                lotId,
+                inventoryId,
                 alert.getAlertType(),
                 alert.getMessage(),
                 alert.getQuantity(),
@@ -158,18 +188,13 @@ public class InventoryAlertServiceImpl implements InventoryAlertService {
                 alert.getCreatedDate()
         );
 
-        // kênh chung cho tất cả admin
         messagingTemplate.convertAndSend("/topic/inventory-alerts", dto);
 
-        // kênh riêng theo branch nếu cần (FE subscribe /topic/inventory-alerts/branch/{id})
         if (dto.getBranchId() != null) {
-            messagingTemplate.convertAndSend(
-                    "/topic/inventory-alerts/branch/" + dto.getBranchId(), dto);
+            messagingTemplate.convertAndSend("/topic/inventory-alerts/branch/" + dto.getBranchId(), dto);
         }
-        // tương tự cho warehouse
         if (dto.getWarehouseId() != null) {
-            messagingTemplate.convertAndSend(
-                    "/topic/inventory-alerts/warehouse/" + dto.getWarehouseId(), dto);
+            messagingTemplate.convertAndSend("/topic/inventory-alerts/warehouse/" + dto.getWarehouseId(), dto);
         }
     }
 }

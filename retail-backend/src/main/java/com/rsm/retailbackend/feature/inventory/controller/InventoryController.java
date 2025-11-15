@@ -26,6 +26,7 @@ public class InventoryController {
             @RequestParam Integer lotId,
             @RequestParam Integer inventoryId
     ) {
+
         var alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new BusinessException("Không tìm thấy alert"));
 
@@ -33,12 +34,19 @@ public class InventoryController {
             throw new BusinessException("Chỉ hỗ trợ hủy cho cảnh báo EXPIRED.");
         }
 
+        // 1️. Clear số lượng của lot này
         lotRepository.clearLotQuantity(lotId);
+
+        // 2️. Tính lại tồn kho tổng
         inventoryRepository.recalcOnHand(inventoryId);
 
+        // 3️. Đánh dấu alert đã xử lý
         alert.setResolvedDate(java.time.Instant.now());
         alert.setIsRead(true);
 
-        return ResponseEntity.ok(new MessageResponse("Đã hủy hàng hết hạn & cập nhật tồn kho."));
+        return ResponseEntity.ok(new MessageResponse(
+                "Đã hủy hàng hết hạn & cập nhật tồn kho.",
+                null
+        ));
     }
 }

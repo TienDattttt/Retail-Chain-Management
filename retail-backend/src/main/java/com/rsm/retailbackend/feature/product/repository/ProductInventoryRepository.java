@@ -4,6 +4,7 @@ import com.rsm.retailbackend.entity.ProductInventory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,11 +32,11 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
            SELECT COALESCE(SUM(l.onHand), 0)
            FROM ProductInventoryLot l
            WHERE l.product.id = pi.product.id
-             AND ((pi.branch IS NOT NULL AND l.branch.id = pi.branch.id)
-               OR (pi.warehouse IS NOT NULL AND l.warehouse.id = pi.warehouse.id))
-       ),
-       pi.lastUpdated = CURRENT_TIMESTAMP
+             AND l.branch.id = pi.branch.id
+             AND l.warehouse.id = pi.warehouse.id
+       )
        WHERE pi.id = :inventoryId
        """)
-    void recalcOnHand(Integer inventoryId);
+    void recalcOnHand(@Param("inventoryId") Integer inventoryId);
+
 }

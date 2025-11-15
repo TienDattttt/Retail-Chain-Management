@@ -14,9 +14,13 @@ public class InventoryAlertDto {
     private String productName;
     private Integer branchId;
     private Integer warehouseId;
+    private Integer lotId;
+    private Integer inventoryId;
     private String alertType;      // LOW_STOCK / NEAR_EXPIRY / EXPIRED
     private String message;
     private Integer quantity;
     private LocalDate expiredDate;
     private Instant createdDate;
+
+
 }
