@@ -46,5 +46,14 @@ public class SupplierController {
         return ResponseEntity.ok(new MessageResponse(msg, result));
     }
 
+    // Toggle trạng thái nhà cung cấp
+    @PutMapping("/{id}/toggle-status")
+    @PreAuthorize("hasAuthority('1')")
+    public ResponseEntity<MessageResponse> toggleStatus(@PathVariable Integer id) {
+        SupplierDto result = supplierService.toggleStatus(id);
+        String status = result.getIsActive() ? "kích hoạt" : "vô hiệu hóa";
+        return ResponseEntity.ok(new MessageResponse("Đã " + status + " nhà cung cấp thành công!", result));
+    }
+
     private record MessageResponse(String message, Object data) {}
 }

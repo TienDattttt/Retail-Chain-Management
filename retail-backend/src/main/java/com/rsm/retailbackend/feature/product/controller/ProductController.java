@@ -3,6 +3,10 @@ package com.rsm.retailbackend.feature.product.controller;
 import com.rsm.retailbackend.feature.common.dto.MessageResponse;
 import com.rsm.retailbackend.feature.product.dto.*;
 import com.rsm.retailbackend.feature.product.service.ProductService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,10 +25,26 @@ public class ProductController {
         this.productService = productService;
     }
 
-    // Lấy tất cả sản phẩm (đang Active)
+    // Lấy tất cả sản phẩm (trừ DELETED)
     @GetMapping
     public ResponseEntity<List<ProductDto>> getAll() {
         return ResponseEntity.ok(productService.getAll());
+    }
+
+    // Lấy tất cả sản phẩm với phân trang (trừ DELETED)
+    @GetMapping("/page")
+    public ResponseEntity<Page<ProductDto>> getAllPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? 
+            Sort.by(sortBy).descending() : 
+            Sort.by(sortBy).ascending();
+            
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(productService.getAllPaged(pageable));
     }
 
     // Lấy theo id
@@ -51,10 +71,33 @@ public class ProductController {
         return ResponseEntity.ok(productService.searchByName(keyword));
     }
 
+    // Tìm kiếm theo tên với phân trang
+    @GetMapping("/search/page")
+    public ResponseEntity<Page<ProductDto>> searchPaged(
+            @RequestParam("q") String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? 
+            Sort.by(sortBy).descending() : 
+            Sort.by(sortBy).ascending();
+            
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(productService.searchByNamePaged(keyword, pageable));
+    }
+
     // Lấy thuộc tính sản phẩm
     @GetMapping("/{id}/attributes")
     public ResponseEntity<List<ProductAttributeDto>> getAttributes(@PathVariable Integer id) {
         return ResponseEntity.ok(productService.getAttributes(id));
+    }
+
+    // Lấy đơn vị sản phẩm
+    @GetMapping("/{id}/units")
+    public ResponseEntity<List<ProductUnitDto>> getUnits(@PathVariable Integer id) {
+        return ResponseEntity.ok(productService.getUnits(id));
     }
 
     // Lấy tồn kho của sản phẩm
@@ -104,5 +147,20 @@ public class ProductController {
     public ResponseEntity<MessageResponse> bulkUpdate(@RequestBody ProductBulkUpdateDto dto) {
         productService.bulkUpdate(dto);
         return ResponseEntity.ok(new MessageResponse("Cập nhật nhiều sản phẩm thành công"));
+    }
+    
+    // Lấy sản phẩm với thông tin tồn kho
+    @GetMapping("/with-stock")
+    public ResponseEntity<List<ProductDto>> getAllWithStock(
+            @RequestParam(required = false) Integer warehouseId,
+            @RequestParam(required = false) Integer branchId) {
+        return ResponseEntity.ok(productService.getAllWithStock(warehouseId, branchId));
+    }
+
+    // Lấy sản phẩm theo chi nhánh cho POS
+    @GetMapping("/branch/{branchId}")
+    @PreAuthorize("hasAnyAuthority('1','2','3')")
+    public ResponseEntity<List<ProductDto>> getProductsByBranch(@PathVariable Integer branchId) {
+        return ResponseEntity.ok(productService.getAllWithStock(null, branchId));
     }
 }

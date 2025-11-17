@@ -32,6 +32,13 @@ public class ProductDto {
     // để tạo/sửa thuộc tính nhanh
     private List<ProductAttributeDto> attributes;
 
+    // để tạo/sửa đơn vị sản phẩm
+    private List<ProductUnitDto> units;
+
     // nếu = true và barcode trống thì server tự sinh
     private Boolean autoGenerateBarcode;
+    
+    // Thông tin tồn kho (chỉ dùng khi cần hiển thị tồn kho)
+    private Integer stock;
+    private Integer availableStock;
 }

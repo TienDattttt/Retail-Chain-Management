@@ -11,4 +11,6 @@ public interface SupplierService {
     SupplierDto getById(Integer id);
 
     SupplierDto upsert(SupplierDto dto);
+
+    SupplierDto toggleStatus(Integer id);
 }

@@ -8,4 +8,5 @@ public interface VoucherService {
     List<VoucherDto> getAll();
     VoucherDto getById(Integer id);
     VoucherDto getByCode(String code);
+    List<VoucherDto> getByCampaign(Integer campaignId);
 }

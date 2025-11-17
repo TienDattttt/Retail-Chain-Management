@@ -57,15 +57,15 @@ public class BranchServiceImpl implements BranchService {
         }
 
         if (dto.getName() != null) b.setName(dto.getName());
-        b.setAddress(dto.getAddress());
-        b.setWardName(dto.getWardName());
-        b.setDistrictName(dto.getDistrictName());
-        b.setCityName(dto.getCityName());
-        b.setPhoneNumber(dto.getPhoneNumber());
-        b.setEmail(dto.getEmail());
-        b.setIsMain(dto.getIsMain() != null ? dto.getIsMain() : Boolean.FALSE);
-        b.setLevel(dto.getLevel());
-        b.setCreatedBy(dto.getCreatedBy());
+        if (dto.getAddress() != null) b.setAddress(dto.getAddress());
+        if (dto.getWardName() != null) b.setWardName(dto.getWardName());
+        if (dto.getDistrictName() != null) b.setDistrictName(dto.getDistrictName());
+        if (dto.getCityName() != null) b.setCityName(dto.getCityName());
+        if (dto.getPhoneNumber() != null) b.setPhoneNumber(dto.getPhoneNumber());
+        if (dto.getEmail() != null) b.setEmail(dto.getEmail());
+        if (dto.getIsMain() != null) b.setIsMain(dto.getIsMain());
+        if (dto.getLevel() != null) b.setLevel(dto.getLevel());
+        if (dto.getCreatedBy() != null) b.setCreatedBy(dto.getCreatedBy());
 
         // Toggle active/inactive logic
         if (dto.getIsActive() != null) {
@@ -105,4 +105,6 @@ public class BranchServiceImpl implements BranchService {
                 .modifiedDate(b.getModifiedDate())
                 .build();
     }
+
+
 }

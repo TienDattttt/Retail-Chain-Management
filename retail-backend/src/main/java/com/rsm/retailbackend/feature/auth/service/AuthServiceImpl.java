@@ -90,7 +90,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByUserName(request.getUserName())
+        User user = userRepository.findByUserNameWithBranch(request.getUserName())
                 .orElseThrow(() -> new BusinessException("Sai tên đăng nhập hoặc mật khẩu", HttpStatus.UNAUTHORIZED.value()));
 
         if (user.getStatus() == null || user.getStatus() != 1) {
@@ -103,7 +103,7 @@ public class AuthServiceImpl implements AuthService {
 
         String token = jwtUtils.generateToken(user.getUserName(), String.valueOf(user.getRole()));
 
-        return new AuthResponse(
+        AuthResponse response = new AuthResponse(
                 user.getId(),
                 user.getUserName(),
                 user.getGivenName(),
@@ -111,5 +111,12 @@ public class AuthServiceImpl implements AuthService {
                 true,
                 token
         );
+        
+        // Set branch info if user has a branch
+        if (user.getBranch() != null) {
+            response.setBranch(user.getBranch());
+        }
+
+        return response;
     }
 }

@@ -34,4 +34,9 @@ public class VoucherController {
     public ResponseEntity<VoucherDto> getByCode(@PathVariable String code) {
         return ResponseEntity.ok(voucherService.getByCode(code));
     }
+
+    @GetMapping("/by-campaign/{campaignId}")
+    public ResponseEntity<List<VoucherDto>> getByCampaign(@PathVariable Integer campaignId) {
+        return ResponseEntity.ok(voucherService.getByCampaign(campaignId));
+    }
 }

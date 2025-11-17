@@ -41,6 +41,14 @@ public class VoucherServiceImpl implements VoucherService {
         return toDto(v);
     }
 
+    @Override
+    public List<VoucherDto> getByCampaign(Integer campaignId) {
+        return voucherRepository.findByVoucherCampaignId(campaignId)
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
     private VoucherDto toDto(Voucher v) {
         VoucherDto dto = new VoucherDto();
         dto.setId(v.getId());

@@ -39,4 +39,21 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
        """)
     void recalcOnHand(@Param("inventoryId") Integer inventoryId);
 
+    @Query("SELECT pi FROM ProductInventory pi " +
+           "JOIN FETCH pi.product p " +
+           "LEFT JOIN FETCH p.category c " +
+           "LEFT JOIN FETCH pi.branch b " +
+           "LEFT JOIN FETCH pi.warehouse w " +
+           "WHERE (:branchId IS NULL OR pi.branch.id = :branchId) " +
+           "AND (:warehouseId IS NULL OR pi.warehouse.id = :warehouseId) " +
+           "AND (:searchTerm IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+           "     OR LOWER(p.code) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) " +
+           "AND (:categoryId IS NULL OR p.category.id = :categoryId)")
+    List<ProductInventory> findStockWithFilters(
+        @Param("searchTerm") String searchTerm,
+        @Param("categoryId") Integer categoryId,
+        @Param("branchId") Integer branchId,
+        @Param("warehouseId") Integer warehouseId
+    );
+
 }

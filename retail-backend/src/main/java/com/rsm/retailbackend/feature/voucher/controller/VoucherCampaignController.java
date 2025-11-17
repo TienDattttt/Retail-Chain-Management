@@ -3,6 +3,7 @@ package com.rsm.retailbackend.feature.voucher.controller;
 
 import com.rsm.retailbackend.feature.common.dto.MessageResponse;
 import com.rsm.retailbackend.feature.voucher.dto.VoucherCampaignDto;
+import com.rsm.retailbackend.feature.voucher.dto.VoucherDto;
 import com.rsm.retailbackend.feature.voucher.service.VoucherCampaignService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.ResponseEntity;
@@ -50,5 +51,20 @@ public class VoucherCampaignController {
                     : "Cập nhật chiến dịch và đã ngưng hoạt động";
         }
         return ResponseEntity.ok(new MessageResponse(msg, saved));
+    }
+
+    /**
+     * Tạo voucher từ campaign
+     * Chỉ admin (role = 1)
+     */
+    @PreAuthorize("hasAuthority('1')")
+    @PostMapping("/{campaignId}/generate-vouchers")
+    public ResponseEntity<MessageResponse> generateVouchers(
+            @PathVariable Integer campaignId,
+            @RequestParam(defaultValue = "1") Integer quantity) {
+        
+        List<VoucherDto> vouchers = campaignService.generateVouchers(campaignId, quantity);
+        String msg = String.format("Đã tạo %d voucher thành công", vouchers.size());
+        return ResponseEntity.ok(new MessageResponse(msg, vouchers));
     }
 }

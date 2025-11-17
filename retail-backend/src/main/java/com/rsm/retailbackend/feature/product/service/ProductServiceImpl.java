@@ -9,7 +9,10 @@ import com.rsm.retailbackend.feature.product.dto.*;
 import com.rsm.retailbackend.feature.product.repository.ProductAttributeRepository;
 import com.rsm.retailbackend.feature.product.repository.ProductInventoryRepository;
 import com.rsm.retailbackend.feature.product.repository.ProductRepository;
+import com.rsm.retailbackend.feature.product.repository.ProductUnitRepository;
 import com.rsm.retailbackend.feature.status.repository.StatusRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final ProductAttributeRepository productAttributeRepository;
+    private final ProductUnitRepository productUnitRepository;
     private final ProductInventoryRepository productInventoryRepository;
     private final CategoryRepository categoryRepository;
     private final Cloudinary cloudinary;
@@ -33,12 +37,14 @@ public class ProductServiceImpl implements ProductService {
 
     public ProductServiceImpl(ProductRepository productRepository,
                               ProductAttributeRepository productAttributeRepository,
+                              ProductUnitRepository productUnitRepository,
                               ProductInventoryRepository productInventoryRepository,
                               CategoryRepository categoryRepository,
                               Cloudinary cloudinary,
                               StatusRepository statusRepository) {
         this.productRepository = productRepository;
         this.productAttributeRepository = productAttributeRepository;
+        this.productUnitRepository = productUnitRepository;
         this.productInventoryRepository = productInventoryRepository;
         this.categoryRepository = categoryRepository;
         this.cloudinary = cloudinary;
@@ -49,12 +55,38 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductDto> getAll() {
-        Status active = statusRepository.findByEntityTypeAndCode("Product", "ACTIVE")
-                .orElseThrow(() -> new BusinessException("Không tìm thấy trạng thái ACTIVE", HttpStatus.INTERNAL_SERVER_ERROR.value()));
-
-        return productRepository.findByStatus(active).stream()
+        // Lấy tất cả sản phẩm trừ DELETED
+        Status deleted = statusRepository.findByEntityTypeAndCode("Product", "DELETED")
+                .orElse(null);
+        
+        List<Product> products;
+        if (deleted != null) {
+            products = productRepository.findByStatusNot(deleted);
+        } else {
+            // Nếu không có status DELETED, lấy tất cả
+            products = productRepository.findAll();
+        }
+        
+        return products.stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<ProductDto> getAllPaged(Pageable pageable) {
+        // Lấy tất cả sản phẩm trừ DELETED với phân trang
+        Status deleted = statusRepository.findByEntityTypeAndCode("Product", "DELETED")
+                .orElse(null);
+        
+        Page<Product> products;
+        if (deleted != null) {
+            products = productRepository.findByStatusNot(deleted, pageable);
+        } else {
+            // Nếu không có status DELETED, lấy tất cả
+            products = productRepository.findAll(pageable);
+        }
+        
+        return products.map(this::toDto);
     }
 
     @Override
@@ -84,6 +116,12 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductDto> searchByName(String keyword) {
         return productRepository.findByNameContainingIgnoreCase(keyword)
                 .stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<ProductDto> searchByNamePaged(String keyword, Pageable pageable) {
+        return productRepository.findByNameContainingIgnoreCase(keyword, pageable)
+                .map(this::toDto);
     }
 
     // ==================== UPSERT ====================
@@ -162,6 +200,44 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
+        // === Product Units ===
+        if (dto.getUnits() != null && !dto.getUnits().isEmpty()) {
+            productUnitRepository.deleteByProduct_Id(saved.getId());
+            
+            // Ensure at least one base unit exists
+            boolean hasBaseUnit = dto.getUnits().stream().anyMatch(u -> Boolean.TRUE.equals(u.getIsBaseUnit()));
+            
+            for (int i = 0; i < dto.getUnits().size(); i++) {
+                ProductUnitDto unitDto = dto.getUnits().get(i);
+                ProductUnit pu = new ProductUnit();
+                pu.setProduct(saved);
+                pu.setUnitName(unitDto.getUnitName());
+                
+                // Handle base unit logic
+                boolean isBaseUnit = Boolean.TRUE.equals(unitDto.getIsBaseUnit()) || (!hasBaseUnit && i == 0);
+                pu.setIsBaseUnit(isBaseUnit);
+                
+                // Base unit always has conversion rate = 1, others use provided rate
+                if (isBaseUnit) {
+                    pu.setConversionRate(BigDecimal.ONE);
+                } else {
+                    pu.setConversionRate(unitDto.getConversionRate() != null ? unitDto.getConversionRate() : BigDecimal.ONE);
+                }
+                
+                pu.setCreatedDate(Instant.now());
+                productUnitRepository.save(pu);
+            }
+        } else if (isCreate && (dto.getUnit() != null && !dto.getUnit().isBlank())) {
+            // Create default base unit from the unit field for backward compatibility
+            ProductUnit defaultUnit = new ProductUnit();
+            defaultUnit.setProduct(saved);
+            defaultUnit.setUnitName(dto.getUnit());
+            defaultUnit.setConversionRate(BigDecimal.ONE);
+            defaultUnit.setIsBaseUnit(true);
+            defaultUnit.setCreatedDate(Instant.now());
+            productUnitRepository.save(defaultUnit);
+        }
+
         return toDto(saved);
     }
 
@@ -172,6 +248,21 @@ public class ProductServiceImpl implements ProductService {
         return productAttributeRepository.findByProduct_Id(productId)
                 .stream()
                 .map(pa -> new ProductAttributeDto(pa.getId(), pa.getAttributeName(), pa.getAttributeValue()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductUnitDto> getUnits(Integer productId) {
+        return productUnitRepository.findByProduct_Id(productId)
+                .stream()
+                .map(pu -> ProductUnitDto.builder()
+                        .id(pu.getId())
+                        .productId(pu.getProduct().getId())
+                        .unitName(pu.getUnitName())
+                        .conversionRate(pu.getConversionRate())
+                        .isBaseUnit(pu.getIsBaseUnit())
+                        .createdDate(pu.getCreatedDate())
+                        .build())
                 .collect(Collectors.toList());
     }
 
@@ -235,6 +326,26 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
+    // ==================== GET WITH STOCK ====================
+    
+    @Override
+    public List<ProductDto> getAllWithStock(Integer warehouseId, Integer branchId) {
+        // Lấy tất cả sản phẩm trừ DELETED
+        Status deleted = statusRepository.findByEntityTypeAndCode("Product", "DELETED")
+                .orElse(null);
+        
+        List<Product> products;
+        if (deleted != null) {
+            products = productRepository.findByStatusNot(deleted);
+        } else {
+            products = productRepository.findAll();
+        }
+        
+        return products.stream()
+                .map(product -> toDtoWithStock(product, warehouseId, branchId))
+                .collect(Collectors.toList());
+    }
+
     // ==================== DTO MAPPING ====================
 
     private ProductDto toDto(Product p) {
@@ -242,6 +353,27 @@ public class ProductServiceImpl implements ProductService {
                 .stream()
                 .map(a -> new ProductAttributeDto(a.getId(), a.getAttributeName(), a.getAttributeValue()))
                 .collect(Collectors.toList());
+
+        List<ProductUnitDto> units = productUnitRepository.findByProduct_Id(p.getId())
+                .stream()
+                .map(pu -> ProductUnitDto.builder()
+                        .id(pu.getId())
+                        .productId(pu.getProduct().getId())
+                        .unitName(pu.getUnitName())
+                        .conversionRate(pu.getConversionRate())
+                        .isBaseUnit(pu.getIsBaseUnit())
+                        .createdDate(pu.getCreatedDate())
+                        .build())
+                .collect(Collectors.toList());
+
+        // If no units exist, create a default unit from the unit field for backward compatibility
+        if (units.isEmpty() && p.getUnit() != null && !p.getUnit().isBlank()) {
+            units.add(ProductUnitDto.builder()
+                    .unitName(p.getUnit())
+                    .conversionRate(BigDecimal.ONE)
+                    .isBaseUnit(true)
+                    .build());
+        }
 
         return ProductDto.builder()
                 .id(p.getId())
@@ -261,6 +393,40 @@ public class ProductServiceImpl implements ProductService {
                 .createdDate(p.getCreatedDate())
                 .modifiedDate(p.getModifiedDate())
                 .attributes(attrs)
+                .units(units)
                 .build();
+    }
+    
+    private ProductDto toDtoWithStock(Product p, Integer warehouseId, Integer branchId) {
+        ProductDto dto = toDto(p); // Lấy thông tin cơ bản
+        
+        // Lấy thông tin tồn kho
+        Optional<ProductInventory> inventory = Optional.empty();
+        
+        if (warehouseId != null && branchId != null) {
+            inventory = productInventoryRepository.findByProduct_IdAndBranch_IdAndWarehouse_Id(
+                p.getId(), branchId, warehouseId);
+        } else if (branchId != null) {
+            inventory = productInventoryRepository.findByProduct_IdAndBranch_Id(
+                p.getId(), branchId);
+        } else if (warehouseId != null) {
+            // Tìm inventory theo warehouse (có thể có nhiều branch)
+            List<ProductInventory> inventories = productInventoryRepository.findByProduct_Id(p.getId());
+            inventory = inventories.stream()
+                .filter(inv -> inv.getWarehouse() != null && inv.getWarehouse().getId().equals(warehouseId))
+                .findFirst();
+        }
+        
+        if (inventory.isPresent()) {
+            ProductInventory inv = inventory.get();
+            dto.setStock(inv.getOnHand() != null ? inv.getOnHand() : 0);
+            dto.setAvailableStock(inv.getAvailable() != null ? inv.getAvailable() : 
+                (inv.getOnHand() != null ? inv.getOnHand() : 0) - (inv.getReserved() != null ? inv.getReserved() : 0));
+        } else {
+            dto.setStock(0);
+            dto.setAvailableStock(0);
+        }
+        
+        return dto;
     }
 }

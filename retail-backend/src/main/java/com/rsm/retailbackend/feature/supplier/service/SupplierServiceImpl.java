@@ -7,9 +7,12 @@ import com.rsm.retailbackend.feature.branch.repository.BranchRepository;
 import com.rsm.retailbackend.feature.supplier.dto.SupplierDto;
 import com.rsm.retailbackend.feature.supplier.repository.SupplierRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -51,29 +54,40 @@ public class SupplierServiceImpl implements SupplierService {
                     .orElseThrow(() -> new BusinessException("Nhà cung cấp không tồn tại", HttpStatus.NOT_FOUND.value()));
             supplier.setModifiedDate(Instant.now());
         } else {
-            // CREATE
-            if (supplierRepository.existsByCode(dto.getCode())) {
-                throw new BusinessException("Mã nhà cung cấp đã tồn tại", HttpStatus.BAD_REQUEST.value());
-            }
+            // CREATE - tự động tạo mã
             supplier = new Supplier();
             supplier.setCreatedDate(Instant.now());
             // nếu UI không gửi isActive thì mặc định true
             supplier.setIsActive(dto.getIsActive() != null ? dto.getIsActive() : true);
+            
+            // Tự động tạo mã nhà cung cấp
+            String code = generateSupplierCode();
+            supplier.setCode(code);
         }
 
-        supplier.setCode(dto.getCode());
+        // Chỉ set code khi update (không cho phép thay đổi code khi tạo mới)
+        if (dto.getId() != null && dto.getCode() != null) {
+            supplier.setCode(dto.getCode());
+        }
         supplier.setName(dto.getName());
         supplier.setContactNumber(dto.getContactNumber());
         supplier.setEmail(dto.getEmail());
         supplier.setAddress(dto.getAddress());
         supplier.setWardName(dto.getWardName());
         supplier.setOrganization(dto.getOrganization());
-        supplier.setTaxCode(dto.getTaxCode());
+        // Bỏ taxCode
+        // supplier.setTaxCode(dto.getTaxCode());
         supplier.setComments(dto.getComments());
         supplier.setDescription(dto.getDescription());
-        supplier.setDebt(dto.getDebt());
-        supplier.setTotalInvoiced(dto.getTotalInvoiced());
-        supplier.setCreatedBy(dto.getCreatedBy());
+        supplier.setDebt(dto.getDebt() != null ? dto.getDebt() : BigDecimal.ZERO);
+        supplier.setTotalInvoiced(dto.getTotalInvoiced() != null ? dto.getTotalInvoiced() : BigDecimal.ZERO);
+        
+        // Sử dụng createdBy từ DTO hoặc lấy từ SecurityContext
+        String createdBy = dto.getCreatedBy();
+        if (createdBy == null || createdBy.isEmpty()) {
+            createdBy = getCurrentUsername();
+        }
+        supplier.setCreatedBy(createdBy);
 
         // cập nhật isActive nếu UI gửi lên
         if (dto.getIsActive() != null) {
@@ -114,5 +128,48 @@ public class SupplierServiceImpl implements SupplierService {
         dto.setCreatedDate(s.getCreatedDate());
         dto.setModifiedDate(s.getModifiedDate());
         return dto;
+    }
+
+    private String generateSupplierCode() {
+        // Tìm mã lớn nhất hiện tại
+        List<Supplier> suppliers = supplierRepository.findAll();
+        int maxNumber = 0;
+        
+        for (Supplier supplier : suppliers) {
+            String code = supplier.getCode();
+            if (code != null && code.startsWith("SUP")) {
+                try {
+                    int number = Integer.parseInt(code.substring(3));
+                    maxNumber = Math.max(maxNumber, number);
+                } catch (NumberFormatException e) {
+                    // Ignore invalid codes
+                }
+            }
+        }
+        
+        return String.format("SUP%03d", maxNumber + 1);
+    }
+
+    @Override
+    public SupplierDto toggleStatus(Integer id) {
+        Supplier supplier = supplierRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("Không tìm thấy nhà cung cấp", HttpStatus.NOT_FOUND.value()));
+        
+        supplier.setIsActive(!supplier.getIsActive());
+        supplier.setModifiedDate(Instant.now());
+        
+        Supplier saved = supplierRepository.save(supplier);
+        return toDto(saved);
+    }
+
+    /**
+     * Lấy username của user hiện tại từ SecurityContext
+     */
+    private String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getName();
+        }
+        return "system"; // fallback nếu không có authentication
     }
 }

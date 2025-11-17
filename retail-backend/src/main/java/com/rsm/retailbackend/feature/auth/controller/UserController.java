@@ -32,6 +32,18 @@ public class UserController {
     }
 
     /**
+     * Lấy profile của user hiện tại
+     */
+    @GetMapping("/profile")
+    @PreAuthorize("hasAnyAuthority('1','2','3')")
+    public ResponseEntity<User> getUserProfile(org.springframework.security.core.Authentication authentication) {
+        String username = authentication.getName();
+        User user = userRepository.findByUserNameWithBranch(username)
+                .orElseThrow(() -> new BusinessException("Không tìm thấy người dùng", HttpStatus.NOT_FOUND.value()));
+        return ResponseEntity.ok(user);
+    }
+
+    /**
      * Lấy danh sách toàn bộ người dùng
      */
     @GetMapping
